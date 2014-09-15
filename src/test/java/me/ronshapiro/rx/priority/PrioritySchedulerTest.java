@@ -29,7 +29,6 @@ public class PrioritySchedulerTest {
         for (int i = 0; i < count; i++) {
             Observable.just(i)
                     .subscribeOn(scheduler.priority(i))
-                    .observeOn(Schedulers.immediate())
                     .subscribe(new Action1<Integer>() {
                         @Override
                         public void call(Integer integer) {
