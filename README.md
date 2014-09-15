@@ -19,3 +19,13 @@ Observable.just(6, 7, 8, 9, 10)
         .subscribeOn(scheduler.priority(PRIORITY_HIGH))
         .subscribe(System.out::println);
 ```
+
+### Priorities
+Priorties are simply ints ordered in increasing order. An action with a priority higher than another will be scheduled before (note that actions with the same priority may run in any order). Priorities may be any valid integer; you may want to define:
+```java
+private static final int PRIORITY_WHENEVER = Integer.MIN_VALUE;
+````
+and/or
+```java
+private static final int PRIORITY_NEXT = Integer.MAX_VALUE;
+```
