@@ -10,7 +10,6 @@ import java.util.concurrent.Executors;
 
 import rx.Observable;
 import rx.functions.Action1;
-import rx.schedulers.Schedulers;
 
 import static org.junit.Assert.fail;
 

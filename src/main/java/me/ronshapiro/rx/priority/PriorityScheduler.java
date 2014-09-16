@@ -4,7 +4,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import rx.Scheduler;
 import rx.Scheduler.Worker;
@@ -25,8 +24,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public final class PriorityScheduler {
 
     private final PriorityBlockingQueue<ComparableAction> queue;
-    private final AtomicInteger workerCount = new AtomicInteger();
-    private ExecutorService executorService;
+    private volatile ExecutorService executorService;
 
     public PriorityScheduler() {
         this(null);
@@ -55,29 +53,21 @@ public final class PriorityScheduler {
 
         @Override
         public Worker createWorker() {
-            synchronized (workerCount) {
-                if (workerCount.get() < parallelism()) {
-                    workerCount.incrementAndGet();
-                    if (executorService == null) {
-                        executorService = Executors.newFixedThreadPool(parallelism());
+            return new PriorityWorker(queue, getExecutorService(), priority);
+        }
+
+        /** Lazy load the {@link ExecutorService}. See Effective Java: Item 71 */
+        private ExecutorService getExecutorService() {
+            ExecutorService result = executorService;
+            if (result == null) {
+                synchronized (PriorityScheduler.this) {
+                    result = executorService;
+                    if (result == null) {
+                        executorService = result = Executors.newFixedThreadPool(parallelism());
                     }
-                    executorService.submit(new Runnable() {
-                        @Override
-                        public void run() {
-                            while (true) {
-                                try {
-                                    ComparableAction action = queue.take();
-                                    action.call();
-                                } catch (InterruptedException e) {
-                                    Thread.currentThread().interrupt();
-                                    break;
-                                }
-                            }
-                        }
-                    });
                 }
             }
-            return new PriorityWorker(queue, priority);
+            return result;
         }
     }
 
@@ -85,10 +75,13 @@ public final class PriorityScheduler {
 
         private final CompositeSubscription compositeSubscription = new CompositeSubscription();
         private final PriorityBlockingQueue<ComparableAction> queue;
+        private final ExecutorService executorService;
         private final int priority;
 
-        private PriorityWorker(PriorityBlockingQueue<ComparableAction> queue, int priority) {
+        private PriorityWorker(PriorityBlockingQueue<ComparableAction> queue,
+                ExecutorService executorService, int priority) {
             this.queue = queue;
+            this.executorService = executorService;
             this.priority = priority;
         }
 
@@ -117,6 +110,16 @@ public final class PriorityScheduler {
             compositeSubscription.add(scheduledAction);
 
             queue.offer(comparableAction, delayTime, unit);
+            executorService.submit(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        queue.take().call();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            });
             return scheduledAction;
         }
 
