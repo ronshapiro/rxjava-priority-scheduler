@@ -24,17 +24,42 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
  */
 public final class PriorityScheduler {
 
-    private final PriorityBlockingQueue<ComparableAction> queue;
+    private final PriorityBlockingQueue<ComparableAction> queue =
+        new PriorityBlockingQueue<ComparableAction>();
     private final AtomicInteger workerCount = new AtomicInteger();
+    private final int concurrency;
     private ExecutorService executorService;
 
-    public PriorityScheduler() {
-        this(null);
+    /**
+     * Creates a {@link PriorityScheduler} with as many threads as the machine's available
+     * processors.
+     *
+     * <b>Note:</b> this does not ensure that the priorities will be adheared to exactly, as the
+     * JVM's threading policy might allow one thread to dequeue an action, then let a second thread
+     * dequeue the next action, run it, dequeue another, run it, etc. before the first thread runs
+     * its action. It does however ensure that at the dequeue step, the thread will receive the
+     * highest priority action available.
+     */
+    public static PriorityScheduler create() {
+        return new PriorityScheduler(Runtime.getRuntime().availableProcessors());
     }
 
-    public PriorityScheduler(ExecutorService executorService) {
-        this.queue = new PriorityBlockingQueue<ComparableAction>();
-        this.executorService = executorService;
+    /**
+     * Creates a {@link PriorityScheduler} using at most {@code concurrency} concurrent actions.
+     *
+     * <b>Note:</b> this does not ensure that the priorities will be adheared to exactly, as the
+     * JVM's threading policy might allow one thread to dequeue an action, then let a second thread
+     * dequeue the next action, run it, dequeue another, run it, etc. before the first thread runs
+     * its action. It does however ensure that at the dequeue step, the thread will receive the
+     * highest priority action available.
+     */
+    public static PriorityScheduler withConcurrency(int concurrency) {
+        return new PriorityScheduler(concurrency);
+    }
+
+    private PriorityScheduler(int concurrency) {
+        this.executorService = Executors.newFixedThreadPool(concurrency);
+        this.concurrency = concurrency;
     }
 
     /**
@@ -56,11 +81,8 @@ public final class PriorityScheduler {
         @Override
         public Worker createWorker() {
             synchronized (workerCount) {
-                if (workerCount.get() < parallelism()) {
+                if (workerCount.get() < concurrency) {
                     workerCount.incrementAndGet();
-                    if (executorService == null) {
-                        executorService = Executors.newFixedThreadPool(parallelism());
-                    }
                     executorService.submit(new Runnable() {
                         @Override
                         public void run() {
