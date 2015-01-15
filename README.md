@@ -33,14 +33,7 @@ private static final int PRIORITY_NEXT = Integer.MAX_VALUE;
 
 Gradle:
 ```groovy
-compile 'me.ronshapiro.rx.priority:priority:0.1'
+compile 'me.ronshapiro.rx.priority:priority:0.2'
 ```
 
-Maven:
-```xml
-<dependency>
-    <groupId>me.ronshapiro.rx.priority</groupId>
-    <artifactId>priority</artifactId>
-    <version>0.1</version>
-</dependency>
-```
+Since this is still a nascent idea, if you're using this library, please let me know ([@rdshapiro](https://twitter.com/rdshapiro)) how it's going!
